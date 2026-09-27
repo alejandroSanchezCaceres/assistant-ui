@@ -774,6 +774,36 @@ describe("adapter conversions", () => {
     expect(result.map((m) => m.id)).toEqual(["u-1", "a-1", "m-2"]);
   });
 
+  it("leaves records attributed to a subagent run out of the thread", () => {
+    const result = fromAgUiMessages([
+      { id: "u-1", role: "user", content: "write it" },
+      {
+        id: "a-1",
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "c-1",
+            type: "function",
+            function: { name: "task", arguments: "{}" },
+          },
+        ],
+      },
+      { id: "t-1", role: "tool", content: "draft", toolCallId: "c-1" },
+      {
+        id: "sub-a-1",
+        role: "assistant",
+        content: "draft",
+        subagentRunId: "sub-1",
+      },
+    ] as any);
+
+    expect(result.map((m) => m.id)).toEqual(["u-1", "a-1"]);
+    expect(result.at(-1)?.content).toMatchObject([
+      { type: "tool-call", toolCallId: "c-1", result: "draft" },
+    ]);
+  });
+
   it("folds the prose a turn spoke before its tool call onto the container", () => {
     const result = fromAgUiMessages([
       { id: "u-1", role: "user", content: "weather?" },

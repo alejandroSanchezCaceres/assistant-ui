@@ -875,6 +875,35 @@ export function fromAgUiMessages(
   messages: readonly unknown[],
   options?: FromAgUiMessagesOptions,
 ): CoreThreadMessageLike[] {
+  return importAgUiMessages(messages, options);
+}
+
+// The message that renders every call on a record carrying calls and nothing
+// else, when that is one message other than the record itself.
+function renderedTurnOwner(
+  message: CoreThreadMessageLike,
+  renderedToolCallOwners: ReadonlyMap<string, string>,
+): string | undefined {
+  if (message.role !== "assistant" || !Array.isArray(message.content))
+    return undefined;
+  let owner: string | undefined;
+  for (const part of message.content) {
+    if (!isObject(part) || part.type !== "tool-call") return undefined;
+    const partOwner = renderedToolCallOwners.get(
+      getString(part, "toolCallId") ?? "",
+    );
+    if (partOwner === undefined || partOwner === message.id) return undefined;
+    if (owner !== undefined && owner !== partOwner) return undefined;
+    owner = partOwner;
+  }
+  return owner;
+}
+
+export function importAgUiMessages(
+  messages: readonly unknown[],
+  options?: FromAgUiMessagesOptions,
+  renderedToolCallOwners?: ReadonlyMap<string, string>,
+): CoreThreadMessageLike[] {
   const showThinking = options?.showThinking ?? true;
   const converted: CoreThreadMessageLike[] = [];
   const a2uiBuckets = new Map<string, A2uiState>();
@@ -927,6 +956,10 @@ export function fromAgUiMessages(
     if (!isObject(rawMessage)) continue;
     const role = getString(rawMessage, "role");
     if (!role) continue;
+    // A record attributed to a subagent run is that run's transcript, which
+    // the live stream nests under the spawning tool call, never a turn of the
+    // thread itself.
+    if (getString(rawMessage, "subagentRunId") !== undefined) continue;
 
     if (role === "tool") {
       flushPendingReasoning();
@@ -1202,6 +1235,11 @@ export function fromAgUiMessages(
   // one message: the container joins the assistant record ahead of it, and
   // what follows a container joins it until the turn carries text, where a
   // further text record opens a message of its own as it does live.
+  //
+  // A live run renders every call of a turn on one message, while the agent may
+  // address each model call to a record of its own. A record whose calls a
+  // message of the running thread already renders joins that message instead of
+  // repeating them beside it.
   const folded: CoreThreadMessageLike[] = [];
   for (const message of converted) {
     const previous = folded[folded.length - 1];
@@ -1209,8 +1247,10 @@ export function fromAgUiMessages(
       previous !== undefined &&
       (isSyntheticToolCallContainer(message)
         ? opensTurn(previous)
-        : isSyntheticToolCallContainer(previous) &&
-          answersToolCallContainer(message))
+        : (isSyntheticToolCallContainer(previous) &&
+            answersToolCallContainer(message)) ||
+          (renderedToolCallOwners !== undefined &&
+            renderedTurnOwner(message, renderedToolCallOwners) === previous.id))
     ) {
       folded[folded.length - 1] = foldTurnRecords(previous, message);
       continue;

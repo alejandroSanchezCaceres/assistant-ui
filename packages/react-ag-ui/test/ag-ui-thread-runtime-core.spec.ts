@@ -8353,6 +8353,219 @@ describe("AGUIThreadRuntimeCore over an @ag-ui/client stream", () => {
     return { agent, bodies };
   };
 
+  const toolCall = (id: string, name: string, parentMessageId: string) => [
+    {
+      type: "TOOL_CALL_START",
+      toolCallId: id,
+      toolCallName: name,
+      parentMessageId,
+    },
+    { type: "TOOL_CALL_ARGS", toolCallId: id, delta: "{}" },
+    { type: "TOOL_CALL_END", toolCallId: id },
+  ];
+
+  const toolCallIds = (messages: readonly ThreadMessage[]) =>
+    messages.flatMap((message) =>
+      message.role === "assistant"
+        ? message.content.flatMap((part) =>
+            part.type === "tool-call" ? [part.toolCallId] : [],
+          )
+        : [],
+    );
+
+  const texts = (messages: readonly ThreadMessage[]) =>
+    messages.flatMap((message) =>
+      message.content.flatMap((part) =>
+        part.type === "text" ? [part.text] : [],
+      ),
+    );
+
+  // One turn as a LangGraph-style backend streams it: every model call
+  // addresses its own record, a subagent speaks inside the `task` call, and
+  // the snapshot lists each record plus the subagent's attributed one.
+  const gatedTurn = [
+    { type: "RUN_STARTED", threadId: "thread-1", runId: "run-1" },
+    ...toolCall("tc-plan", "write_todos", "ai-1"),
+    {
+      type: "TOOL_CALL_RESULT",
+      messageId: "tool-1",
+      toolCallId: "tc-plan",
+      content: "planned",
+      role: "tool",
+    },
+    ...toolCall("tc-task", "task", "ai-2"),
+    {
+      type: "SUBAGENT_STARTED",
+      subagentRunId: "sub-1",
+      name: "writer",
+      parentToolCallId: "tc-task",
+    },
+    {
+      type: "TEXT_MESSAGE_START",
+      messageId: "ai-sub",
+      role: "assistant",
+      subagentRunId: "sub-1",
+    },
+    {
+      type: "TEXT_MESSAGE_CONTENT",
+      messageId: "ai-sub",
+      delta: "draft",
+      subagentRunId: "sub-1",
+    },
+    { type: "TEXT_MESSAGE_END", messageId: "ai-sub", subagentRunId: "sub-1" },
+    { type: "SUBAGENT_FINISHED", subagentRunId: "sub-1", result: "draft" },
+    {
+      type: "TOOL_CALL_RESULT",
+      messageId: "tool-2",
+      toolCallId: "tc-task",
+      content: "draft",
+      role: "tool",
+    },
+    ...toolCall("tc-save", "save_note", "ai-3"),
+    {
+      type: "MESSAGES_SNAPSHOT",
+      messages: [
+        { id: "u-1", role: "user", content: "hi" },
+        {
+          id: "ai-1",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-plan",
+              type: "function",
+              function: { name: "write_todos", arguments: "{}" },
+            },
+          ],
+        },
+        {
+          id: "tool-1",
+          role: "tool",
+          toolCallId: "tc-plan",
+          content: "planned",
+        },
+        {
+          id: "ai-2",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-task",
+              type: "function",
+              function: { name: "task", arguments: "{}" },
+            },
+          ],
+        },
+        { id: "tool-2", role: "tool", toolCallId: "tc-task", content: "draft" },
+        {
+          id: "ai-3",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-save",
+              type: "function",
+              function: { name: "save_note", arguments: "{}" },
+            },
+          ],
+        },
+        {
+          id: "ai-sub",
+          role: "assistant",
+          content: "draft",
+          subagentRunId: "sub-1",
+        },
+      ],
+    },
+    {
+      type: "RUN_FINISHED",
+      threadId: "thread-1",
+      runId: "run-1",
+      outcome: {
+        type: "interrupt",
+        interrupts: [
+          { id: "int-1", reason: "tool_call", toolCallId: "tc-save" },
+        ],
+      },
+    },
+  ];
+
+  it("keeps a turn split across snapshot records on the message the run rendered", async () => {
+    const { agent } = streamingAgent([gatedTurn]);
+    const core = createCore(agent);
+
+    await core.append(createAppendMessage());
+
+    const assistants = core
+      .getMessages()
+      .filter((message) => message.role === "assistant");
+    expect(assistants.map((message) => message.id)).toEqual(["ai-1"]);
+    expect(toolCallIds(core.getMessages())).toEqual([
+      "tc-plan",
+      "tc-task",
+      "tc-save",
+    ]);
+    expect(texts(core.getMessages())).not.toContain("draft");
+    expect(core.getPendingInterrupts()).toMatchObject({
+      messageId: "ai-1",
+      interrupts: [{ id: "int-1", toolCallId: "tc-save" }],
+    });
+  });
+
+  it("resumes the gate and renders the answer once", async () => {
+    const { agent, bodies } = streamingAgent([
+      gatedTurn,
+      [
+        { type: "RUN_STARTED", threadId: "thread-1", runId: "run-2" },
+        {
+          type: "TOOL_CALL_RESULT",
+          messageId: "tool-3",
+          toolCallId: "tc-save",
+          content: "saved",
+          role: "tool",
+        },
+        { type: "TEXT_MESSAGE_START", messageId: "ai-4", role: "assistant" },
+        { type: "TEXT_MESSAGE_CONTENT", messageId: "ai-4", delta: "Saved." },
+        { type: "TEXT_MESSAGE_END", messageId: "ai-4" },
+        {
+          type: "MESSAGES_SNAPSHOT",
+          messages: [
+            ...(gatedTurn.find(
+              (event) => event.type === "MESSAGES_SNAPSHOT",
+            ) as { messages: object[] })!.messages,
+            {
+              id: "tool-3",
+              role: "tool",
+              toolCallId: "tc-save",
+              content: "saved",
+            },
+            { id: "ai-4", role: "assistant", content: "Saved." },
+          ],
+        },
+        { type: "RUN_FINISHED", threadId: "thread-1", runId: "run-2" },
+      ],
+    ]);
+    const core = createCore(agent);
+    await core.append(createAppendMessage());
+
+    await core.submitInterruptResponses([
+      { interruptId: "int-1", status: "resolved", payload: { approved: true } },
+    ]);
+
+    expect(bodies[1].resume).toEqual([
+      { interruptId: "int-1", status: "resolved", payload: { approved: true } },
+    ]);
+    expect(
+      texts(core.getMessages()).filter((text) => text === "Saved."),
+    ).toHaveLength(1);
+    expect(toolCallIds(core.getMessages())).toEqual([
+      "tc-plan",
+      "tc-task",
+      "tc-save",
+    ]);
+    expect(core.getPendingInterrupts()).toBeNull();
+  });
+
   it("renders legacy thinking and chunk events the client upgrades", async () => {
     const { agent } = streamingAgent([
       [

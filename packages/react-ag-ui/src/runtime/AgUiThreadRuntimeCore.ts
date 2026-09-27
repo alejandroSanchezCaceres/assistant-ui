@@ -53,7 +53,7 @@ import {
   tryParseJSON,
 } from "./adapter/run-aggregator";
 import {
-  fromAgUiMessages,
+  importAgUiMessages,
   toAgUiMessages,
   toAgUiTools,
 } from "./adapter/conversions";
@@ -2042,9 +2042,20 @@ export class AgUiThreadRuntimeCore {
         : undefined;
       const activeAssistant =
         activeMessage?.role === "assistant" ? activeMessage : undefined;
-      const normalized = fromAgUiMessages(rawMessages, {
-        showThinking: this.showThinking,
-      });
+      const renderedToolCallOwners = new Map<string, string>();
+      for (const message of this.session.getMessages()) {
+        if (message.role !== "assistant") continue;
+        for (const part of message.content) {
+          if (part.type === "tool-call") {
+            renderedToolCallOwners.set(part.toolCallId, message.id);
+          }
+        }
+      }
+      const normalized = importAgUiMessages(
+        rawMessages,
+        { showThinking: this.showThinking },
+        renderedToolCallOwners,
+      );
       const converted: ThreadMessage[] = [];
       for (const message of normalized) {
         try {
