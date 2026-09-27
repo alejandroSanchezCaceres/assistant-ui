@@ -206,31 +206,6 @@ export const parseAgUiEvent = (
           subagentRunId: getString("subagentRunId"),
         },
       );
-    case "TEXT_MESSAGE_CHUNK": {
-      const delta = getString("delta") ?? "";
-      return withOptional(
-        { type: "TEXT_MESSAGE_CHUNK" as const, delta },
-        {
-          messageId: getString("messageId"),
-          subagentRunId: getString("subagentRunId"),
-        },
-      );
-    }
-    case "THINKING_START":
-      return withOptional(
-        { type: "THINKING_START" as const },
-        { title: getString("title") },
-      );
-    case "THINKING_TEXT_MESSAGE_START":
-      return { type: "THINKING_TEXT_MESSAGE_START" };
-    case "THINKING_TEXT_MESSAGE_CONTENT": {
-      const delta = getString("delta") ?? "";
-      return { type: "THINKING_TEXT_MESSAGE_CONTENT", delta };
-    }
-    case "THINKING_TEXT_MESSAGE_END":
-      return { type: "THINKING_TEXT_MESSAGE_END" };
-    case "THINKING_END":
-      return { type: "THINKING_END" };
     case "REASONING_START":
       return withOptional(
         { type: "REASONING_START" as const },
@@ -323,17 +298,6 @@ export const parseAgUiEvent = (
         { subagentRunId: getString("subagentRunId") },
       );
     }
-    case "TOOL_CALL_CHUNK":
-      return withOptional(
-        { type: "TOOL_CALL_CHUNK" as const },
-        {
-          toolCallId: getString("toolCallId"),
-          toolCallName: getString("toolCallName"),
-          parentMessageId: getString("parentMessageId"),
-          delta: getString("delta"),
-          subagentRunId: getString("subagentRunId"),
-        },
-      );
     case "TOOL_CALL_RESULT": {
       const toolCallId = getString("toolCallId");
       if (!toolCallId) return reject("missing toolCallId");

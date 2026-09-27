@@ -199,7 +199,7 @@ describe("createAgUiSubscriber", () => {
     });
 
     subscriber.onRunFinishedEvent?.({
-      event: { type: "TEXT_MESSAGE_CHUNK", delta: "hi" },
+      event: { type: "TEXT_MESSAGE_CONTENT", delta: "hi" },
     });
     subscriber.onRunFinalized?.();
 

@@ -516,33 +516,7 @@ describe("parseAgUiEvent", () => {
     });
   });
 
-  it("parses subagentRunId on the chunk variants and ACTIVITY_SNAPSHOT", () => {
-    expect(
-      parseAgUiEvent({
-        type: "TEXT_MESSAGE_CHUNK",
-        messageId: "m1",
-        delta: "hi",
-        subagentRunId: "sub-1",
-      }),
-    ).toEqual({
-      type: "TEXT_MESSAGE_CHUNK",
-      messageId: "m1",
-      delta: "hi",
-      subagentRunId: "sub-1",
-    });
-    expect(
-      parseAgUiEvent({
-        type: "TOOL_CALL_CHUNK",
-        toolCallId: "t1",
-        delta: "{}",
-        subagentRunId: "sub-1",
-      }),
-    ).toEqual({
-      type: "TOOL_CALL_CHUNK",
-      toolCallId: "t1",
-      delta: "{}",
-      subagentRunId: "sub-1",
-    });
+  it("parses subagentRunId on ACTIVITY_SNAPSHOT", () => {
     expect(
       parseAgUiEvent({
         type: "ACTIVITY_SNAPSHOT",

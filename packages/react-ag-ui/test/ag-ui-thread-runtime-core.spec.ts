@@ -115,6 +115,7 @@ const notifyRunFinished = (
   subscriber?.onRunFinishedEvent?.({
     event,
     outcome: "success",
+    pendingToolCallIds: [],
     ...createAgentSubscriberParams(),
   });
 };
@@ -8014,44 +8015,6 @@ describe("AGUIThreadRuntimeCore", () => {
     });
   });
 
-  it("signs reasoning that arrived on the legacy thinking channel", async () => {
-    const runInputs: any[] = [];
-    const runAgent = vi.fn(async (input, subscriber) => {
-      runInputs.push(JSON.parse(JSON.stringify(input)));
-      if (runInputs.length === 1) {
-        subscriber.onThinkingTextMessageStartEvent?.({
-          event: { type: "THINKING_TEXT_MESSAGE_START" },
-        });
-        subscriber.onThinkingTextMessageContentEvent?.({
-          event: { type: "THINKING_TEXT_MESSAGE_CONTENT", delta: "pondering" },
-        });
-        subscriber.onReasoningEncryptedValueEvent?.({
-          event: {
-            type: "REASONING_ENCRYPTED_VALUE",
-            subtype: "message",
-            entityId: "unmatched-entity",
-            encryptedValue: "signed-blob",
-          },
-        });
-        subscriber.onTextMessageContentEvent?.({
-          event: { type: "TEXT_MESSAGE_CONTENT", delta: "done" },
-        });
-      }
-      subscriber.onRunFinalized?.();
-    });
-    const core = createCore({ runAgent } as unknown as HttpAgent);
-
-    await core.append(createAppendMessage());
-    const assistant = core.getMessages().at(-1) as ThreadAssistantMessage;
-    await core.append(createAppendMessage({ parentId: assistant.id }));
-
-    expect(runInputs[1].messages[1]).toMatchObject({
-      role: "reasoning",
-      content: "pondering",
-      encryptedValue: "signed-blob",
-    });
-  });
-
   it("replays the signature of an empty signed reasoning block on the next run", async () => {
     const runInputs: any[] = [];
     const runAgent = vi.fn(async (input, subscriber) => {
@@ -8142,8 +8105,12 @@ describe("AGUIThreadRuntimeCore", () => {
         subscriber.onReasoningStartEvent?.({
           event: { type: "REASONING_START", messageId: "p-1" },
         });
-        subscriber.onThinkingTextMessageContentEvent?.({
-          event: { type: "THINKING_TEXT_MESSAGE_CONTENT", delta: "pondering" },
+        subscriber.onReasoningMessageContentEvent?.({
+          event: {
+            type: "REASONING_MESSAGE_CONTENT",
+            messageId: "p-1",
+            delta: "pondering",
+          },
         });
         subscriber.onReasoningEncryptedValueEvent?.({
           event: {
@@ -8364,5 +8331,57 @@ describe("AGUIThreadRuntimeCore", () => {
       content: "weighing options",
       encryptedValue: "signed-blob",
     });
+  });
+});
+
+describe("AGUIThreadRuntimeCore over an @ag-ui/client stream", () => {
+  const sse = (events: readonly object[]) =>
+    events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("");
+
+  const streamingAgent = (runs: readonly (readonly object[])[]) => {
+    const bodies: any[] = [];
+    const agent = new HttpAgent({
+      url: "https://example.invalid",
+      threadId: "thread-1",
+      fetch: async (_url, requestInit) => {
+        bodies.push(JSON.parse(String(requestInit.body)));
+        return new Response(sse(runs[bodies.length - 1] ?? []), {
+          headers: { "content-type": "text/event-stream" },
+        });
+      },
+    });
+    return { agent, bodies };
+  };
+
+  it("renders legacy thinking and chunk events the client upgrades", async () => {
+    const { agent } = streamingAgent([
+      [
+        { type: "RUN_STARTED", threadId: "thread-1", runId: "run-1" },
+        { type: "THINKING_START" },
+        { type: "THINKING_TEXT_MESSAGE_START" },
+        { type: "THINKING_TEXT_MESSAGE_CONTENT", delta: "pondering" },
+        { type: "THINKING_TEXT_MESSAGE_END" },
+        { type: "THINKING_END" },
+        { type: "TEXT_MESSAGE_CHUNK", messageId: "ai-1", delta: "Hello" },
+        {
+          type: "TOOL_CALL_CHUNK",
+          toolCallId: "tc-1",
+          toolCallName: "search",
+          parentMessageId: "ai-1",
+          delta: '{"q":"x"}',
+        },
+        { type: "RUN_FINISHED", threadId: "thread-1", runId: "run-1" },
+      ],
+    ]);
+    const core = createCore(agent);
+
+    await core.append(createAppendMessage());
+
+    const assistant = core.getMessages().at(-1) as ThreadAssistantMessage;
+    expect(assistant.content).toMatchObject([
+      { type: "reasoning", text: "pondering" },
+      { type: "text", text: "Hello" },
+      { type: "tool-call", toolCallId: "tc-1", argsText: '{"q":"x"}' },
+    ]);
   });
 });

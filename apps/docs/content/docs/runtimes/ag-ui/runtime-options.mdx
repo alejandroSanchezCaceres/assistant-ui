@@ -13,7 +13,7 @@ Reference for the runtime's API surface. Start with [quickstart](/docs/runtimes/
 | --- | --- | --- |
 | `agent` | `HttpAgent` | An AG-UI client agent (from `@ag-ui/client`). Required. |
 | `logger` | `Partial<Logger>` | Optional logger overrides. The runtime logs event-parser warnings and run lifecycle events. |
-| `showThinking` | `boolean` | Whether to render `THINKING_*` and `REASONING_*` events as visible reasoning. Defaults to `true`. |
+| `showThinking` | `boolean` | Whether to render `REASONING_*` events as visible reasoning. Defaults to `true`. |
 | `autoCancelPendingToolCalls` | `boolean` | Cancel unresolved client-side tool calls automatically when the user sends, edits, or reloads a message. Defaults to `true`. See [below](#auto-cancelling-pending-tool-calls). |
 | `resumeTranscript` | `"full" \| "appended"` | What `messages` carries on a run that also carries `resume`. Defaults to `"full"`. See [below](#the-transcript-on-a-resume-run). |
 | `onError` | `(e: Error) => void` | Error callback fired on `RUN_ERROR` events and protocol errors. |
@@ -255,12 +255,8 @@ The runtime parses the AG-UI event stream and maps each event type to assistant-
 | `RUN_CANCELLED` | Marks the in-flight assistant message as cancelled. |
 | `RUN_ERROR` | Marks the message as errored; fires `onError`. |
 | `TEXT_MESSAGE_START` / `_CONTENT` / `_END` | Streams text content into an assistant message. |
-| `TEXT_MESSAGE_CHUNK` | Appends a delta without explicit lifecycle. |
-| `THINKING_START` / `_END` | Wraps reasoning blocks (when `showThinking` is on). |
-| `THINKING_TEXT_MESSAGE_*` | Streams thinking text deltas. |
 | `REASONING_START` / `_MESSAGE_*` / `_END` | Streams structured reasoning per message. |
 | `TOOL_CALL_START` / `_ARGS` / `_END` | Streams tool calls into the current assistant message. |
-| `TOOL_CALL_CHUNK` | Streams tool deltas without explicit lifecycle. |
 | `TOOL_CALL_RESULT` | Attaches a tool result to a tool call. |
 | `SUBAGENT_STARTED` | Opens a nested assistant message for the subagent run, attached to the tool call named by `parentToolCallId`. |
 | `SUBAGENT_FINISHED` | Completes the nested message and records `result`; a `suspended` outcome marks it `requires-action`. |
@@ -270,6 +266,8 @@ The runtime parses the AG-UI event stream and maps each event type to assistant-
 | `MESSAGES_SNAPSHOT` | Replaces the full message list (used for thread restore). |
 | `CUSTOM` | Appended to the in-flight assistant message as a `data` part. |
 | `RAW` | Parsed and ignored; unrecognized wire event types are normalized into `RAW`. |
+
+`@ag-ui/client` expands `TEXT_MESSAGE_CHUNK` and `TOOL_CALL_CHUNK` into their start, content, and end events and upgrades the retired `THINKING_*` events to `REASONING_*` before any subscriber sees them, so a backend that still emits them renders the same as one that emits the lifecycle events.
 
 ### Custom events
 

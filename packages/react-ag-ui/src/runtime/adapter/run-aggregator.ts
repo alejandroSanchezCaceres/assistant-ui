@@ -345,9 +345,8 @@ export class RunAggregator {
         this.emit();
         break;
       }
-      case "TEXT_MESSAGE_CONTENT":
-      case "TEXT_MESSAGE_CHUNK": {
-        const incomingId = "messageId" in event ? event.messageId : undefined;
+      case "TEXT_MESSAGE_CONTENT": {
+        const incomingId = event.messageId;
         const scope = this.scopeOf(event);
         if (scope === ROOT_SCOPE) {
           this.beginDistinctTextMessage(incomingId);
@@ -387,13 +386,11 @@ export class RunAggregator {
         break;
       }
 
-      case "THINKING_START":
-      case "THINKING_TEXT_MESSAGE_START":
       case "REASONING_START":
       case "REASONING_MESSAGE_START":
         this.handleReasoningStart(
-          this.scopeOf("subagentRunId" in event ? event : {}),
-          "messageId" in event ? event.messageId : undefined,
+          this.scopeOf(event),
+          event.messageId,
           event.type === "REASONING_MESSAGE_START",
         );
         break;
@@ -436,24 +433,15 @@ export class RunAggregator {
           }
         }
         break;
-      case "THINKING_TEXT_MESSAGE_CONTENT":
-        this.handleReasoningContent(ROOT_SCOPE, event.delta);
-        this.totalChunks++;
-        this.recordFirstToken();
-        break;
       case "REASONING_MESSAGE_CONTENT":
         this.handleReasoningContent(
           this.scopeOf(event),
           event.delta,
-          "messageId" in event ? event.messageId : undefined,
+          event.messageId,
           true,
         );
         this.totalChunks++;
         this.recordFirstToken();
-        break;
-      case "THINKING_TEXT_MESSAGE_END":
-      case "THINKING_END":
-        this.handleReasoningEnd(ROOT_SCOPE);
         break;
       case "REASONING_MESSAGE_END":
       case "REASONING_END":
@@ -474,14 +462,7 @@ export class RunAggregator {
         this.emit();
         break;
       }
-      case "TOOL_CALL_ARGS":
-      case "TOOL_CALL_CHUNK": {
-        if (
-          event.type === "TOOL_CALL_CHUNK" &&
-          this.scopeOf(event) === ROOT_SCOPE
-        ) {
-          this.reportServerMessageId(event.parentMessageId);
-        }
+      case "TOOL_CALL_ARGS": {
         if (!event.delta) break;
         this.appendToolArgs(event.toolCallId, event.delta);
         this.emit();

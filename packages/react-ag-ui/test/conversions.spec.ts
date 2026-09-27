@@ -3,7 +3,8 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import { z } from "zod";
 import type { Tool } from "assistant-stream";
-import { MessageSchema, UserMessageSchema, type Message } from "@ag-ui/client";
+import type { Message } from "@ag-ui/client";
+import { MessageSchema, UserMessageSchema } from "@ag-ui/core/schemas";
 import {
   applyA2uiOperations,
   convertSurfaceToUISpec,

@@ -11,12 +11,6 @@ type Subscriber = {
   onTextMessageStartEvent?: (payload: { event: unknown }) => void;
   onTextMessageContentEvent?: (payload: { event: unknown }) => void;
   onTextMessageEndEvent?: (payload: { event: unknown }) => void;
-  onTextMessageChunkEvent?: (payload: { event: unknown }) => void;
-  onThinkingStartEvent?: (payload: { event: unknown }) => void;
-  onThinkingEndEvent?: (payload: { event: unknown }) => void;
-  onThinkingTextMessageStartEvent?: (payload: { event: unknown }) => void;
-  onThinkingTextMessageContentEvent?: (payload: { event: unknown }) => void;
-  onThinkingTextMessageEndEvent?: (payload: { event: unknown }) => void;
   onReasoningStartEvent?: (payload: { event: unknown }) => void;
   onReasoningEndEvent?: (payload: { event: unknown }) => void;
   onReasoningMessageStartEvent?: (payload: { event: unknown }) => void;
@@ -26,7 +20,6 @@ type Subscriber = {
   onToolCallStartEvent?: (payload: { event: unknown }) => void;
   onToolCallArgsEvent?: (payload: { event: unknown }) => void;
   onToolCallEndEvent?: (payload: { event: unknown }) => void;
-  onToolCallChunkEvent?: (payload: { event: unknown }) => void;
   onToolCallResultEvent?: (payload: { event: unknown }) => void;
   onActivitySnapshotEvent?: (payload: { event: unknown }) => void;
   onStateSnapshotEvent?: (payload: { event: unknown }) => void;
@@ -109,17 +102,6 @@ export const createAgUiSubscriber = (
       dispatchIfValid(event, "TEXT_MESSAGE_CONTENT"),
     onTextMessageEndEvent: ({ event }) =>
       dispatchIfValid(event, "TEXT_MESSAGE_END"),
-    onTextMessageChunkEvent: ({ event }) =>
-      dispatchIfValid(event, "TEXT_MESSAGE_CHUNK"),
-    onThinkingStartEvent: ({ event }) =>
-      dispatchIfValid(event, "THINKING_START"),
-    onThinkingEndEvent: ({ event }) => dispatchIfValid(event, "THINKING_END"),
-    onThinkingTextMessageStartEvent: ({ event }) =>
-      dispatchIfValid(event, "THINKING_TEXT_MESSAGE_START"),
-    onThinkingTextMessageContentEvent: ({ event }) =>
-      dispatchIfValid(event, "THINKING_TEXT_MESSAGE_CONTENT"),
-    onThinkingTextMessageEndEvent: ({ event }) =>
-      dispatchIfValid(event, "THINKING_TEXT_MESSAGE_END"),
     onReasoningStartEvent: ({ event }) =>
       dispatchIfValid(event, "REASONING_START"),
     onReasoningEndEvent: ({ event }) => dispatchIfValid(event, "REASONING_END"),
@@ -136,8 +118,6 @@ export const createAgUiSubscriber = (
     onToolCallArgsEvent: ({ event }) =>
       dispatchIfValid(event, "TOOL_CALL_ARGS"),
     onToolCallEndEvent: ({ event }) => dispatchIfValid(event, "TOOL_CALL_END"),
-    onToolCallChunkEvent: ({ event }) =>
-      dispatchIfValid(event, "TOOL_CALL_CHUNK"),
     onToolCallResultEvent: ({ event }) =>
       dispatchIfValid(event, "TOOL_CALL_RESULT"),
     onActivitySnapshotEvent: ({ event }) =>

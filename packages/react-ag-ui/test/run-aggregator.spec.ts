@@ -606,35 +606,6 @@ describe("RunAggregator", () => {
     ).toBeUndefined();
   });
 
-  it("maps thinking events to reasoning part when enabled", () => {
-    const aggregator = createAggregator(true);
-
-    aggregator.handle({ type: "RUN_STARTED", runId: "r1" } as AgUiEvent);
-    aggregator.handle({ type: "THINKING_TEXT_MESSAGE_START" } as AgUiEvent);
-    aggregator.handle({
-      type: "THINKING_TEXT_MESSAGE_CONTENT",
-      delta: "Reasoning...",
-    } as AgUiEvent);
-    aggregator.handle({ type: "THINKING_TEXT_MESSAGE_END" } as AgUiEvent);
-
-    const reasoningPart = results.at(-1)?.content?.[0];
-    expect(reasoningPart?.type).toBe("reasoning");
-    expect((reasoningPart as any).text).toBe("Reasoning...");
-  });
-
-  it("ignores thinking events when disabled", () => {
-    const aggregator = createAggregator(false);
-
-    aggregator.handle({ type: "RUN_STARTED", runId: "r1" } as AgUiEvent);
-    aggregator.handle({
-      type: "THINKING_TEXT_MESSAGE_CONTENT",
-      delta: "hidden",
-    } as AgUiEvent);
-
-    const parts = results.at(-1)?.content ?? [];
-    expect(parts.every((part) => part.type !== "reasoning")).toBe(true);
-  });
-
   it("maps reasoning events to reasoning part when enabled", () => {
     const aggregator = createAggregator(true);
 
@@ -1957,9 +1928,13 @@ describe("RunAggregator", () => {
     const aggregator = createAggregator(true);
 
     aggregator.handle({ type: "RUN_STARTED", runId: "r1" } as AgUiEvent);
-    aggregator.handle({ type: "THINKING_TEXT_MESSAGE_START" } as AgUiEvent);
     aggregator.handle({
-      type: "THINKING_TEXT_MESSAGE_CONTENT",
+      type: "REASONING_MESSAGE_START",
+      messageId: "reason-1",
+    } as AgUiEvent);
+    aggregator.handle({
+      type: "REASONING_MESSAGE_CONTENT",
+      messageId: "reason-1",
       delta: "Reasoning first",
     } as AgUiEvent);
     aggregator.handle({
@@ -2238,32 +2213,6 @@ describe("RunAggregator", () => {
     expect(last?.content).toEqual([{ type: "text", text: "follow-up" }]);
   });
 
-  it("records a later CHUNK id even when the opening frame has no delta", () => {
-    const onTextMessageStart = vi.fn();
-    const aggregator = createAggregator(false, undefined, onTextMessageStart);
-
-    aggregator.handle({ type: "RUN_STARTED", runId: "r1" } as AgUiEvent);
-    aggregator.handle({
-      type: "TEXT_MESSAGE_START",
-      messageId: "srv-1",
-    } as AgUiEvent);
-    aggregator.handle({
-      type: "TEXT_MESSAGE_CHUNK",
-      messageId: "srv-2",
-      delta: "",
-    } as AgUiEvent);
-    aggregator.handle({
-      type: "TEXT_MESSAGE_CHUNK",
-      messageId: "srv-2",
-      delta: "follow-up",
-    } as AgUiEvent);
-
-    expect(onTextMessageStart).toHaveBeenCalledTimes(1);
-    expect(onTextMessageStart).toHaveBeenCalledWith("srv-2");
-    const last = results.at(-1);
-    expect(last?.content).toEqual([{ type: "text", text: "follow-up" }]);
-  });
-
   it("splits after a tool-only first message", () => {
     const onTextMessageStart = vi.fn();
     const aggregator = createAggregator(false, undefined, onTextMessageStart);
@@ -2412,7 +2361,7 @@ describe("RunAggregator", () => {
       toolCallName: "search",
     } as AgUiEvent);
     aggregator.handle({
-      type: "TOOL_CALL_CHUNK",
+      type: "TOOL_CALL_ARGS",
       toolCallId: "t1",
       delta: '{"q":"test"}',
     } as AgUiEvent);
@@ -3315,7 +3264,7 @@ describe("RunAggregator", () => {
     expect(nested.status).toEqual({ type: "incomplete", reason: "cancelled" });
   });
 
-  it("attributes TEXT_MESSAGE_CHUNK to its subagent, the same as TEXT_MESSAGE_CONTENT", () => {
+  it("attributes TEXT_MESSAGE_CONTENT to its subagent", () => {
     const aggregator = createAggregator(true);
 
     aggregator.handle({ type: "RUN_STARTED", runId: "r1" } as AgUiEvent);
@@ -3331,7 +3280,7 @@ describe("RunAggregator", () => {
       parentToolCallId: "t-spawn",
     } as AgUiEvent);
     aggregator.handle({
-      type: "TEXT_MESSAGE_CHUNK",
+      type: "TEXT_MESSAGE_CONTENT",
       messageId: "m-sub",
       delta: "chunked subagent text",
       subagentRunId: "sub-1",

@@ -174,17 +174,6 @@ export type AgUiEvent =
       subagentRunId?: string;
     }
   | { type: "TEXT_MESSAGE_END"; messageId?: string; subagentRunId?: string }
-  | {
-      type: "TEXT_MESSAGE_CHUNK";
-      messageId?: string;
-      delta: string;
-      subagentRunId?: string;
-    }
-  | { type: "THINKING_START"; title?: string }
-  | { type: "THINKING_TEXT_MESSAGE_START" }
-  | { type: "THINKING_TEXT_MESSAGE_CONTENT"; delta: string }
-  | { type: "THINKING_TEXT_MESSAGE_END" }
-  | { type: "THINKING_END" }
   | { type: "REASONING_START"; messageId?: string; subagentRunId?: string }
   | {
       type: "REASONING_MESSAGE_START";
@@ -224,14 +213,6 @@ export type AgUiEvent =
       subagentRunId?: string;
     }
   | { type: "TOOL_CALL_END"; toolCallId: string; subagentRunId?: string }
-  | {
-      type: "TOOL_CALL_CHUNK";
-      toolCallId?: string;
-      toolCallName?: string;
-      parentMessageId?: string;
-      delta?: string;
-      subagentRunId?: string;
-    }
   | {
       type: "TOOL_CALL_RESULT";
       messageId?: string;

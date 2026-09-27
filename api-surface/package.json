@@ -7,7 +7,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@ag-ui/client": "^0.0.59",
+    "@ag-ui/client": "^1.0.0",
     "@ai-sdk/provider": "^4.0.14",
     "@ai-sdk/react": "^4.0.104",
     "@earendil-works/pi-coding-agent": "^0.85.1",

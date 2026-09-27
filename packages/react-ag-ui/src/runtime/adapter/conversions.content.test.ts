@@ -1,9 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import {
-  MessageSchema,
-  UserMessageSchema,
-  type Message as AgUiWireMessage,
-} from "@ag-ui/client";
+import type { Message as AgUiWireMessage } from "@ag-ui/client";
+import { MessageSchema, UserMessageSchema } from "@ag-ui/core/schemas";
 import type { AppendMessage } from "@assistant-ui/core";
 import {
   fromAgUiMessages,
